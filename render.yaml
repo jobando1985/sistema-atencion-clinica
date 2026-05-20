@@ -17,7 +17,7 @@ services:
     runtime: node
     plan: free
     rootDir: backend
-    buildCommand: npm install && npm run migrate
+    buildCommand: npm install && npm run migrate && npm run seed
     startCommand: npm start
     envVars:
       - key: DATABASE_URL
