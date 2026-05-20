@@ -1,0 +1,34 @@
+# =====================================================================
+# Configuración de despliegue en Render
+# =====================================================================
+# Crea una base de datos PostgreSQL gratuita y un servicio web Node.js.
+# Para usar: conectar este repo en https://render.com -> "New Blueprint"
+# =====================================================================
+
+databases:
+  - name: clinica-db
+    plan: free
+    databaseName: clinica
+    user: clinica
+
+services:
+  - type: web
+    name: clinica-app
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npm run migrate
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: clinica-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 12h
+      - key: NODE_ENV
+        value: production
+      - key: CORS_ORIGIN
+        value: "*"
