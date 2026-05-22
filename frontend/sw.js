@@ -1,5 +1,5 @@
 // Service Worker mínimo para que la app sea instalable como PWA
-const CACHE = 'clinica-v1';
+const CACHE = 'clinica-v2';
 const ASSETS = [
     './',
     './index.html',
