@@ -97,12 +97,14 @@ function openPacienteForm(paciente = null) {
             if (isEdit) {
                 await Api.put(`/pacientes/${p.id}`, data);
                 toast('Paciente actualizado', 'success');
+                closeModal();
+                loadPacientes($('#pac-search')?.value || '');
             } else {
-                await Api.post('/pacientes', data);
+                const nuevoPaciente = await Api.post('/pacientes', data);
                 toast('Paciente creado', 'success');
+                closeModal();
+                openNuevoTurnoModal(nuevoPaciente);
             }
-            closeModal();
-            loadPacientes($('#pac-search')?.value || '');
         } catch (err) {
             toast(err.message, 'error');
         }
@@ -163,14 +165,6 @@ function buildField({ name, label, type = 'text', value = '', required = false, 
     return fg;
 }
 
-async function agregarACola(paciente) {
-    try {
-        await Api.post('/turnos', {
-            paciente_id: paciente.id,
-            motivo: 'Atención por orden de llegada',
-        });
-        toast(`${paciente.apellido}, ${paciente.nombre} agregado a la cola`, 'success');
-    } catch (err) {
-        toast(err.message, 'error');
-    }
+function agregarACola(paciente) {
+    openNuevoTurnoModal(paciente);
 }

@@ -192,7 +192,7 @@ async function atenderPaciente(turno) {
 }
 
 // ── Modal: agregar paciente a la cola con selector de médico ──────────
-async function openNuevoTurnoModal() {
+async function openNuevoTurnoModal(pacientePreseleccionado = null) {
     const medicos = await getMisMedicos();
 
     const content = el('div');
@@ -240,6 +240,14 @@ async function openNuevoTurnoModal() {
     content.appendChild(fgPrior);
 
     let selectedId = null;
+
+    if (pacientePreseleccionado) {
+        selectedId = pacientePreseleccionado.id;
+        searchInput.value = `${pacientePreseleccionado.apellido}, ${pacientePreseleccionado.nombre} (DNI ${pacientePreseleccionado.dni})`;
+        searchInput.disabled = true;
+        resultsBox.style.display = 'none';
+    }
+
     let timer;
     searchInput.addEventListener('input', (e) => {
         clearTimeout(timer);
