@@ -247,7 +247,7 @@ async function openNuevoTurnoModal() {
             const q = e.target.value.trim();
             if (q.length < 2) { resultsBox.innerHTML = ''; return; }
             try {
-                const pacs = await Api.get(`/pacientes?q=${encodeURIComponent(q)}`);
+                const pacs = await Api.get(`/pacientes?q=${encodeURIComponent(q)}&for_queue=1`);
                 resultsBox.innerHTML = '';
                 if (pacs.length === 0) {
                     resultsBox.innerHTML = '<p style="color:#6b7280; padding:8px;">Sin resultados</p>';
