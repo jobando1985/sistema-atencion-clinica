@@ -73,8 +73,29 @@ router.get('/', async (req, res, next) => {
 // Si no se envía fecha_turno, va directo a la cola por orden de llegada
 router.post('/', async (req, res, next) => {
     try {
-        const { paciente_id, medico_id, fecha_turno, motivo, prioridad } = req.body;
+        const { paciente_id, fecha_turno, motivo, prioridad } = req.body;
+        let { medico_id } = req.body;
         if (!paciente_id) return res.status(400).json({ error: 'paciente_id es obligatorio' });
+
+        // Auto-asignar médico si no viene en el payload
+        if (!medico_id) {
+            if (req.user.rol === 'medico') {
+                medico_id = req.user.id;
+            } else if (req.user.rol === 'secretaria') {
+                const { rows: asig } = await pool.query(
+                    `SELECT medico_id FROM secretaria_medico WHERE secretaria_id = $1`,
+                    [req.user.id]
+                );
+                if (asig.length === 0) {
+                    return res.status(400).json({ error: 'No tenés médicos asignados. Pedile al administrador que te asigne uno.' });
+                }
+                if (asig.length === 1) {
+                    medico_id = asig[0].medico_id;
+                } else {
+                    return res.status(400).json({ error: 'Seleccioná el médico al que querés asignar el turno.' });
+                }
+            }
+        }
 
         const estado = fecha_turno ? 'programado' : 'en_espera';
         const { rows } = await pool.query(

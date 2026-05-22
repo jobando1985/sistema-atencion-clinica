@@ -193,7 +193,18 @@ async function atenderPaciente(turno) {
 
 // ── Modal: agregar paciente a la cola con selector de médico ──────────
 async function openNuevoTurnoModal(pacientePreseleccionado = null) {
-    const medicos = await getMisMedicos();
+    let medicos;
+    try {
+        medicos = await getMisMedicos();
+    } catch (err) {
+        toast('Error al cargar médicos: ' + err.message, 'error');
+        return;
+    }
+
+    if (medicos.length === 0 && Api.usuario.rol !== 'admin') {
+        toast('No tenés médicos asignados. Pedile al administrador que te asigne uno.', 'error');
+        return;
+    }
 
     const content = el('div');
     content.appendChild(el('h3', {}, 'Agregar paciente a la cola'));
@@ -283,8 +294,8 @@ async function openNuevoTurnoModal(pacientePreseleccionado = null) {
         onclick: async () => {
             if (!selectedId) { toast('Seleccioná un paciente', 'error'); return; }
             const medicoSel = $('#turno-medico');
-            const medicoId  = medicoSel ? medicoSel.value : null;
-            if (medicos.length > 0 && !medicoId) { toast('Seleccioná un médico', 'error'); return; }
+            const medicoId  = medicoSel ? medicoSel.value : (medicos.length === 1 ? medicos[0].id : null);
+            if (medicos.length > 1 && !medicoId) { toast('Seleccioná un médico', 'error'); return; }
             const fecha   = $('#turno-fecha').value;
             const urgente = $('#turno-urgente').checked;
             try {
