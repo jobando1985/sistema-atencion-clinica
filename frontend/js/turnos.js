@@ -2,43 +2,114 @@
 // Módulo: Turnos y Cola de Espera
 // =====================================================================
 
+// Cache de médicos asignados al usuario actual
+let _misMedicos = null;
+
+async function getMisMedicos() {
+    if (_misMedicos) return _misMedicos;
+    _misMedicos = await Api.get('/secretaria-medico/mis-medicos');
+    return _misMedicos;
+}
+
 async function renderDashboard(container) {
+    _misMedicos = null; // refrescar lista al cargar
     container.innerHTML = '';
 
     const header = el('div', { class: 'page-header' });
-    header.appendChild(el('h2', {}, Api.usuario.rol === 'medico' ? 'Pacientes en espera' : 'Panel de Recepción'));
+    const titulo = Api.usuario.rol === 'medico' ? 'Pacientes en espera' : 'Panel de Recepción';
+    header.appendChild(el('h2', {}, titulo));
     if (Api.usuario.rol !== 'medico') {
         header.appendChild(el('button', {
             class: 'btn', onclick: () => openNuevoTurnoModal()
-        }, '+ Nuevo turno'));
+        }, '+ Agregar a la cola'));
     }
     container.appendChild(header);
 
+    if (Api.usuario.rol === 'medico') {
+        // El médico solo ve su propia cola
+        await renderColaMedico(container, Api.usuario.id);
+    } else {
+        // Secretaria/admin: tabs por médico
+        await renderColaSecretaria(container);
+    }
+}
+
+// ── Cola del médico (solo la suya) ──────────────────────────────────
+async function renderColaMedico(container, medicoId) {
     const statsDiv = el('div', { class: 'stats', id: 'stats' });
     container.appendChild(statsDiv);
 
     const card = el('div', { class: 'card' });
-    card.appendChild(el('div', { class: 'card-header' },
-        el('h3', {}, 'Cola por orden de llegada')
-    ));
+    card.appendChild(el('div', { class: 'card-header' }, el('h3', {}, 'Cola por orden de llegada')));
     const list = el('div', { id: 'cola-list' });
     card.appendChild(list);
     container.appendChild(card);
 
-    await loadCola();
+    await loadCola(medicoId);
 }
 
-async function loadCola() {
+// ── Cola multi-médico para secretaria/admin ──────────────────────────
+async function renderColaSecretaria(container) {
+    const medicos = await getMisMedicos();
+
+    if (medicos.length === 0) {
+        container.appendChild(el('div', { class: 'card', style: 'padding:24px;' },
+            el('p', { style: 'color:#6b7280;' }, 'No tenés médicos asignados. Pedile al administrador que te asigne médicos.')));
+        return;
+    }
+
+    // Tabs de médicos
+    const tabsBar = el('div', { class: 'tabs', style: 'margin-bottom:16px;' });
+    container.appendChild(tabsBar);
+
+    const colaContainer = el('div', { id: 'cola-container' });
+    container.appendChild(colaContainer);
+
+    let medicoActivo = medicos[0].id;
+
+    const renderTab = async (medicoId) => {
+        medicoActivo = medicoId;
+        $$('.tab-btn').forEach(b => b.classList.remove('active'));
+        $(`#tab-med-${medicoId}`)?.classList.add('active');
+
+        colaContainer.innerHTML = '';
+        const statsDiv = el('div', { class: 'stats', id: 'stats' });
+        colaContainer.appendChild(statsDiv);
+        const card = el('div', { class: 'card' });
+        card.appendChild(el('div', { class: 'card-header' },
+            el('h3', {}, `Cola de ${medicos.find(m => m.id === medicoId)?.nombre || ''}`)
+        ));
+        const list = el('div', { id: 'cola-list' });
+        card.appendChild(list);
+        colaContainer.appendChild(card);
+        await loadCola(medicoId);
+    };
+
+    for (const m of medicos) {
+        const btn = el('button', {
+            class: 'tab-btn' + (m.id === medicoActivo ? ' active' : ''),
+            id: `tab-med-${m.id}`,
+            onclick: () => renderTab(m.id)
+        }, m.nombre + (m.especialidad ? ` (${m.especialidad})` : ''));
+        tabsBar.appendChild(btn);
+    }
+
+    await renderTab(medicoActivo);
+}
+
+// ── Carga la cola de un médico ────────────────────────────────────────
+async function loadCola(medicoId) {
     const list = $('#cola-list');
+    if (!list) return;
     list.innerHTML = '<p style="padding: 20px; color: #6b7280;">Cargando...</p>';
 
     try {
-        const cola = await Api.get('/turnos/cola');
+        const url = medicoId ? `/turnos/cola?medico_id=${medicoId}` : '/turnos/cola';
+        const cola = await Api.get(url);
 
-        // Stats
         const statsDiv = $('#stats');
         if (statsDiv) {
-            const enEspera = cola.filter(t => t.estado === 'en_espera').length;
+            const enEspera   = cola.filter(t => t.estado === 'en_espera').length;
             const enAtencion = cola.filter(t => t.estado === 'en_atencion').length;
             statsDiv.innerHTML = `
                 <div class="stat-card"><div class="label">En espera</div><div class="value">${enEspera}</div></div>
@@ -55,7 +126,6 @@ async function loadCola() {
         list.innerHTML = '';
         cola.forEach((t, idx) => {
             const item = el('div', { class: 'queue-item' + (t.prioridad > 0 ? ' urgente' : '') });
-
             const info = el('div', { class: 'info' });
             const edad = calculateAge(t.fecha_nacimiento);
             info.innerHTML = `
@@ -68,6 +138,7 @@ async function loadCola() {
                 <div class="meta">
                     DNI ${t.dni} ${edad ? `· ${edad} años` : ''} · Llegó ${formatDateTime(t.llegada_en)}
                     ${t.obra_social ? `· ${t.obra_social}` : ''}
+                    ${t.medico_nombre && Api.usuario.rol !== 'medico' ? `· <strong>${t.medico_nombre}</strong>` : ''}
                 </div>
                 ${t.notas_alerta ? `<div class="alert-box danger" style="margin-top:6px;"><strong>⚠ Alerta:</strong> ${t.notas_alerta}</div>` : ''}
                 ${t.alergias ? `<div class="meta" style="margin-top:4px;"><strong>Alergias:</strong> ${t.alergias}</div>` : ''}
@@ -96,11 +167,10 @@ async function loadCola() {
                 actions.appendChild(el('button', {
                     class: 'btn btn-danger btn-sm',
                     onclick: async () => {
-                        if (await confirmDialog('¿Quitar de la cola?')) {
-                            await Api.patch(`/turnos/${t.id}`, { estado: 'cancelado' });
-                            toast('Turno cancelado', 'success');
-                            loadCola();
-                        }
+                        if (!await confirmDialog('¿Quitar de la cola?')) return;
+                        await Api.patch(`/turnos/${t.id}`, { estado: 'cancelado' });
+                        toast('Turno cancelado', 'success');
+                        loadCola(medicoId);
                     }
                 }, 'Cancelar'));
             }
@@ -114,20 +184,35 @@ async function loadCola() {
 
 async function atenderPaciente(turno) {
     try {
-        await Api.patch(`/turnos/${turno.id}`, {
-            estado: 'en_atencion',
-            medico_id: Api.usuario.id
-        });
+        await Api.patch(`/turnos/${turno.id}`, { estado: 'en_atencion', medico_id: Api.usuario.id });
         location.hash = `#/ficha/${turno.paciente_id}?turno=${turno.id}`;
     } catch (err) {
         toast(err.message, 'error');
     }
 }
 
+// ── Modal: agregar paciente a la cola con selector de médico ──────────
 async function openNuevoTurnoModal() {
+    const medicos = await getMisMedicos();
+
     const content = el('div');
     content.appendChild(el('h3', {}, 'Agregar paciente a la cola'));
 
+    // Selector de médico
+    if (medicos.length > 0) {
+        const fgMed = el('div', { class: 'form-group' });
+        fgMed.appendChild(el('label', {}, 'Médico *'));
+        const selMed = el('select', { id: 'turno-medico' });
+        if (medicos.length > 1) selMed.appendChild(el('option', { value: '' }, '-- Seleccionar médico --'));
+        medicos.forEach(m => selMed.appendChild(
+            el('option', { value: m.id, ...(medicos.length === 1 ? { selected: true } : {}) },
+                m.nombre + (m.especialidad ? ` — ${m.especialidad}` : ''))
+        ));
+        fgMed.appendChild(selMed);
+        content.appendChild(fgMed);
+    }
+
+    // Búsqueda de paciente
     const searchFg = el('div', { class: 'form-group' });
     searchFg.appendChild(el('label', {}, 'Buscar paciente'));
     const searchInput = el('input', { type: 'text', placeholder: 'Nombre, apellido o DNI...', id: 'turno-search' });
@@ -138,7 +223,7 @@ async function openNuevoTurnoModal() {
     content.appendChild(resultsBox);
 
     const fgFecha = el('div', { class: 'form-group' });
-    fgFecha.appendChild(el('label', {}, 'Fecha de turno (opcional - dejar vacío para cola por orden de llegada)'));
+    fgFecha.appendChild(el('label', {}, 'Fecha de turno (opcional — dejar vacío para cola por orden de llegada)'));
     fgFecha.appendChild(el('input', { type: 'datetime-local', id: 'turno-fecha' }));
     content.appendChild(fgFecha);
 
@@ -189,23 +274,29 @@ async function openNuevoTurnoModal() {
         class: 'btn',
         onclick: async () => {
             if (!selectedId) { toast('Seleccioná un paciente', 'error'); return; }
-            const fecha = $('#turno-fecha').value;
+            const medicoSel = $('#turno-medico');
+            const medicoId  = medicoSel ? medicoSel.value : null;
+            if (medicos.length > 0 && !medicoId) { toast('Seleccioná un médico', 'error'); return; }
+            const fecha   = $('#turno-fecha').value;
             const urgente = $('#turno-urgente').checked;
             try {
                 await Api.post('/turnos', {
                     paciente_id: selectedId,
+                    medico_id:   medicoId || null,
                     fecha_turno: fecha || null,
-                    motivo: $('#turno-motivo').value,
-                    prioridad: urgente ? 1 : 0,
+                    motivo:      $('#turno-motivo').value,
+                    prioridad:   urgente ? 1 : 0,
                 });
-                toast('Turno creado', 'success');
+                toast('Paciente agregado a la cola', 'success');
                 closeModal();
-                loadCola();
+                // Refrescar la vista actual
+                const c = $('#main-content');
+                renderDashboard(c);
             } catch (err) {
                 toast(err.message, 'error');
             }
         }
-    }, 'Crear turno'));
+    }, 'Agregar a la cola'));
     content.appendChild(actions);
 
     showModal(content);

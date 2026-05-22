@@ -26,6 +26,9 @@ function renderApp() {
         { view: 'dashboard', label: '🕐 Cola / Turnos', hash: '#/dashboard' },
         { view: 'pacientes', label: '👥 Pacientes', hash: '#/pacientes' },
     ];
+    if (Api.usuario.rol === 'admin') {
+        items.push({ view: 'admin', label: '⚙ Administración', hash: '#/admin' });
+    }
     for (const it of items) {
         const li = el('li');
         const a = el('a', {

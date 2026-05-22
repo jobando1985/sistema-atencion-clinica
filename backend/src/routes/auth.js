@@ -18,7 +18,7 @@ router.post('/login', async (req, res, next) => {
         }
 
         const { rows } = await pool.query(
-            'SELECT id, nombre, email, password_hash, rol, matricula, especialidad, activo FROM usuarios WHERE email = $1',
+            'SELECT id, nombre, email, password_hash, rol, matricula, especialidad, activo, debe_cambiar_clave FROM usuarios WHERE email = $1',
             [email.toLowerCase().trim()]
         );
 
@@ -44,6 +44,7 @@ router.post('/login', async (req, res, next) => {
 
         res.json({
             token,
+            debe_cambiar_clave: user.debe_cambiar_clave,
             usuario: {
                 id: user.id,
                 nombre: user.nombre,
@@ -56,6 +57,31 @@ router.post('/login', async (req, res, next) => {
     } catch (err) {
         next(err);
     }
+});
+
+// PATCH /api/auth/cambiar-password — el propio usuario cambia su clave
+router.patch('/cambiar-password', requireAuth, async (req, res, next) => {
+    try {
+        const { password_actual, password_nuevo } = req.body;
+        if (!password_actual || !password_nuevo) {
+            return res.status(400).json({ error: 'password_actual y password_nuevo son obligatorios' });
+        }
+        if (password_nuevo.length < 6) {
+            return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' });
+        }
+        const { rows } = await pool.query('SELECT password_hash FROM usuarios WHERE id = $1', [req.user.id]);
+        if (rows.length === 0) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+        const valid = await bcrypt.compare(password_actual, rows[0].password_hash);
+        if (!valid) return res.status(401).json({ error: 'Contraseña actual incorrecta' });
+
+        const hash = await bcrypt.hash(password_nuevo, 10);
+        await pool.query(
+            'UPDATE usuarios SET password_hash = $1, debe_cambiar_clave = FALSE WHERE id = $2',
+            [hash, req.user.id]
+        );
+        res.json({ ok: true });
+    } catch (err) { next(err); }
 });
 
 // GET /api/auth/me

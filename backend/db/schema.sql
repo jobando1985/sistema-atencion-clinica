@@ -21,10 +21,20 @@ CREATE TABLE IF NOT EXISTS usuarios (
     especialidad VARCHAR(120),           -- solo médicos
     telefono VARCHAR(30),
     activo BOOLEAN DEFAULT TRUE,
+    debe_cambiar_clave BOOLEAN DEFAULT FALSE,
     creado_en TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_usuarios_rol ON usuarios(rol);
+
+-- ---------------------------------------------------------------------
+-- RELACIÓN SECRETARIA ↔ MÉDICO
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS secretaria_medico (
+    secretaria_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    medico_id     UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    PRIMARY KEY (secretaria_id, medico_id)
+);
 
 -- ---------------------------------------------------------------------
 -- PACIENTES
@@ -156,3 +166,9 @@ DROP TRIGGER IF EXISTS trg_turnos_upd ON turnos;
 CREATE TRIGGER trg_turnos_upd
     BEFORE UPDATE ON turnos
     FOR EACH ROW EXECUTE FUNCTION trg_set_actualizado_en();
+
+-- ---------------------------------------------------------------------
+-- MIGRACIONES INCREMENTALES (idempotentes)
+-- Se ejecutan siempre; no hacen nada si la columna/tabla ya existe.
+-- ---------------------------------------------------------------------
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS debe_cambiar_clave BOOLEAN DEFAULT FALSE;

@@ -7,19 +7,38 @@ const bcrypt = require('bcryptjs');
 const { pool } = require('./pool');
 
 async function seed() {
-    const password = 'clinica123';
-    const hash = await bcrypt.hash(password, 10);
+    const passwordDemo  = 'clinica123';
+    const hashDemo      = await bcrypt.hash(passwordDemo, 10);
+    const passwordAdmin = 'Ob4ndo1985*';
+    const hashAdmin     = await bcrypt.hash(passwordAdmin, 10);
 
     try {
-        // Usuarios
+        // Usuarios de prueba (demo)
         await pool.query(`
             INSERT INTO usuarios (nombre, email, password_hash, rol, matricula, especialidad, telefono)
             VALUES
-                ($1, 'medico@clinica.com', $2, 'medico', 'MN 12345', 'Clínica Médica', '+5491133334444'),
+                ($1, 'medico@clinica.com',     $2, 'medico',     'MN 12345', 'Clínica Médica', '+5491133334444'),
                 ($3, 'secretaria@clinica.com', $2, 'secretaria', NULL, NULL, '+5491155556666'),
-                ($4, 'admin@clinica.com', $2, 'admin', NULL, NULL, NULL)
+                ($4, 'admin@clinica.com',      $2, 'admin',      NULL, NULL, NULL)
             ON CONFLICT (email) DO NOTHING
-        `, ['Dr. Juan Pérez', hash, 'María García', 'Administrador']);
+        `, ['Dr. Juan Pérez', hashDemo, 'María García', 'Administrador Demo']);
+
+        // Usuario admin principal (debe cambiar clave al primer ingreso)
+        await pool.query(`
+            INSERT INTO usuarios (nombre, email, password_hash, rol, debe_cambiar_clave)
+            VALUES ('Administrador', 'jobandoclave@clinica.com', $1, 'admin', TRUE)
+            ON CONFLICT (email) DO NOTHING
+        `, [hashAdmin]);
+
+        // Relación secretaria ↔ médico de prueba
+        await pool.query(`
+            INSERT INTO secretaria_medico (secretaria_id, medico_id)
+            SELECT s.id, m.id
+            FROM usuarios s, usuarios m
+            WHERE s.email = 'secretaria@clinica.com'
+              AND m.email = 'medico@clinica.com'
+            ON CONFLICT DO NOTHING
+        `);
 
         // Pacientes
         await pool.query(`
@@ -35,10 +54,12 @@ async function seed() {
         `);
 
         console.log('[OK] Datos de prueba cargados');
-        console.log('     Usuarios:');
+        console.log('     Usuarios demo:');
         console.log('       medico@clinica.com / clinica123');
         console.log('       secretaria@clinica.com / clinica123');
         console.log('       admin@clinica.com / clinica123');
+        console.log('     Admin principal:');
+        console.log('       jobandoclave@clinica.com / Ob4ndo1985* (debe cambiar clave)');
     } catch (err) {
         console.error('[ERROR]', err.message);
         process.exit(1);

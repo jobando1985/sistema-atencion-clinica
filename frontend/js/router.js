@@ -8,6 +8,7 @@ const routes = [
     { pattern: /^#\/dashboard\/?$/, handler: () => navigate('dashboard') },
     { pattern: /^#\/pacientes\/?$/, handler: () => navigate('pacientes') },
     { pattern: /^#\/turnos\/?$/, handler: () => navigate('dashboard') },
+    { pattern: /^#\/admin\/?$/, handler: () => navigate('admin') },
     { pattern: /^#\/ficha\/([^/?]+)/, handler: (m, params) => navigate('ficha', { pacienteId: m[1], params }) },
 ];
 
@@ -52,12 +53,14 @@ function navigate(view, data = {}) {
         dashboard: 'dashboard',
         pacientes: 'pacientes',
         ficha: 'pacientes',
+        admin: 'admin',
     };
     const activeNav = $(`.sidebar-nav a[data-view="${activeMap[view]}"]`);
     if (activeNav) activeNav.classList.add('active');
 
     if (view === 'dashboard') renderDashboard(content);
     else if (view === 'pacientes') renderPacientes(content);
+    else if (view === 'admin') renderAdmin(content);
     else if (view === 'ficha') renderFichaPaciente(content, data.pacienteId, data.params || new URLSearchParams());
 }
 

@@ -14,6 +14,8 @@ const turnosRoutes = require('./routes/turnos');
 const consultasRoutes = require('./routes/consultas');
 const recetasRoutes = require('./routes/recetas');
 const estudiosRoutes = require('./routes/estudios');
+const usuariosRoutes = require('./routes/usuarios');
+const secretariaMedicoRoutes = require('./routes/secretariaMedico');
 
 const app = express();
 
@@ -43,6 +45,8 @@ app.use('/api/turnos', turnosRoutes);
 app.use('/api/consultas', consultasRoutes);
 app.use('/api/recetas', recetasRoutes);
 app.use('/api/estudios', estudiosRoutes);
+app.use('/api/usuarios', usuariosRoutes);
+app.use('/api/secretaria-medico', secretariaMedicoRoutes);
 
 // Servir el frontend estático (../../frontend)
 const frontendPath = path.join(__dirname, '..', '..', 'frontend');

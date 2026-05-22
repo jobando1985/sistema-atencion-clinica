@@ -9,18 +9,40 @@ const router = express.Router();
 router.use(requireAuth);
 
 // GET /api/turnos/cola - pacientes en espera (ordenados por llegada)
+// ?medico_id=uuid  filtra por médico específico
+// Médico: solo ve su propia cola. Secretaria/admin: filtra por medico_id o todos sus médicos.
 router.get('/cola', async (req, res, next) => {
     try {
+        const { medico_id } = req.query;
+        let whereExtra = '';
+        const params = [];
+
+        if (req.user.rol === 'medico') {
+            // El médico solo ve su propia cola
+            whereExtra = 'AND t.medico_id = $1';
+            params.push(req.user.id);
+        } else if (medico_id) {
+            whereExtra = 'AND t.medico_id = $1';
+            params.push(medico_id);
+        } else if (req.user.rol === 'secretaria') {
+            // Secretaria sin filtro: ve la cola de todos sus médicos asignados
+            whereExtra = `AND t.medico_id IN (
+                SELECT medico_id FROM secretaria_medico WHERE secretaria_id = $1
+            )`;
+            params.push(req.user.id);
+        }
+
         const { rows } = await pool.query(`
             SELECT t.*, p.nombre, p.apellido, p.dni, p.fecha_nacimiento,
                    p.alergias, p.notas_alerta, p.obra_social,
-                   m.nombre as medico_nombre
+                   m.nombre as medico_nombre, m.especialidad as medico_especialidad
             FROM turnos t
             JOIN pacientes p ON p.id = t.paciente_id
             LEFT JOIN usuarios m ON m.id = t.medico_id
             WHERE t.estado IN ('en_espera', 'en_atencion')
+            ${whereExtra}
             ORDER BY t.prioridad DESC, t.llegada_en ASC
-        `);
+        `, params);
         res.json(rows);
     } catch (err) { next(err); }
 });

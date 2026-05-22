@@ -464,3 +464,26 @@ tbody tr:hover { background: var(--bg); cursor: pointer; }
     flex-wrap: wrap;
 }
 .search-bar input { flex: 1; min-width: 200px; }
+
+/* Tabs */
+.tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    border-bottom: 2px solid var(--primary-light);
+    padding-bottom: 0;
+}
+.tab-btn {
+    padding: 8px 16px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-radius: 6px 6px 0 0;
+    font-size: 13px;
+    color: var(--text-muted);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.15s, border-color 0.15s;
+}
+.tab-btn:hover { color: var(--primary); }
+.tab-btn.active { color: var(--primary-dark); border-bottom-color: var(--primary); font-weight: 600; }
